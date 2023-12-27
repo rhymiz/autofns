@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "autofns"
-version = "0.1.4"
+version = "0.1.5"
 description = "AutoFNS is a utility for automatically calling functions when interacting with the OpenAI Completions."
 authors = ["Lemi Boyce <lemuelboyce@gmail.com>"]
 readme = "README.md"
@@ -10,8 +10,6 @@ packages = [{ include = "autofns", from = "src" }]
 [tool.poetry.dependencies]
 python = "^3.10"
 openai = "^1.6.1"
-tenacity = "^8.2.3"
-regex = "^2023.12.25"
 
 [tool.poetry.group.dev.dependencies]
 black = "^23.12.1"
