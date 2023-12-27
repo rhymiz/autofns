@@ -80,6 +80,20 @@ fns = AutoFNS(
 result = fns.create_completion(messages=[...])
 ```
 
+You can also use the `@fns.map_function` decorator to add a function to
+AutoFNS internal mapping:
+
+```python
+from autofns import AutoFNS
+
+fns = AutoFNS(...)
+
+
+@fns.map_function  # can also pass a name to map_function
+def get_temp_units():
+    return ["Fahrenheit", "Celsius", "Kelvin"]
+```
+
 You can also use the `AutoFNSAsync` class to use async functions:
 
 ```python

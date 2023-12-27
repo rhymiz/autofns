@@ -24,14 +24,14 @@ class AutoFNS:
         self,
         model: str,
         /,
-        fns_mapping: dict[str, Callable[..., Any]],
         fns_definitions: list[dict[str, Any]],
+        fns_mapping: dict[str, Callable[..., Any]] | None = None,
         api_key: str | None = None,
         client: _CLIENT_TYPE = OpenAI,
         response_format: dict[str, str] | None = None,
     ):
         self.model = model
-        self.fns_mapping = fns_mapping
+        self.fns_mapping = fns_mapping or {}
         self.fns_definitions = fns_definitions
 
         if api_key:
@@ -42,6 +42,42 @@ class AutoFNS:
             self.client = client()
 
         self.response_format = response_format or _DEFAULT_RESPONSE_FORMAT
+
+    def map_function(self, fn_name: str | None = None):
+        """
+        Decorator to map a function to AutoFNS.
+
+        :param fn_name:
+        :type fn_name:
+        :return:
+        :rtype:
+        """
+
+        def decorator(fn: Callable[..., Any]):
+            fn_name_ = fn_name or fn.__name__
+
+            fn_definition = next(
+                (
+                    fn_definition
+                    for fn_definition in self.fns_definitions
+                    if fn_definition["function"]["name"] == fn_name_
+                ),
+                None,
+            )
+
+            if fn_definition is None:
+                raise ValueError(
+                    f"Function '{fn_name_}' is not defined in fns_definitions."
+                )
+
+            self.fns_mapping[fn_name_] = fn
+
+            def wrapper(*args, **kwargs):
+                return fn(*args, **kwargs)
+
+            return wrapper
+
+        return decorator
 
     def default_kwargs(self) -> dict[str, Any]:
         """
@@ -134,8 +170,8 @@ class AutoFNSAsync(AutoFNS):
     ):
         super().__init__(
             model,
-            fns_mapping,
             fns_definitions,
+            fns_mapping,
             api_key,
             client,
             response_format,
@@ -209,3 +245,10 @@ class AutoFNSAsync(AutoFNS):
 
 
 __all__ = ["AutoFNS", "AutoFNSAsync"]
+
+fns = AutoFNS("davinci")
+
+
+@fns.map_function
+def my_function():
+    pass
