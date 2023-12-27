@@ -1,16 +1,16 @@
 import asyncio
 import json
 import logging
-from typing import Any, Callable, Type, Union
+from typing import Any, Callable
 
 from openai import AsyncOpenAI, OpenAI
-from openai.types.chat.chat_completion_message import ChatCompletionMessage
+from openai.types.chat import ChatCompletion
 from openai.types.chat.chat_completion_message_tool_call import (
     ChatCompletionMessageToolCall,
 )
 
-_CLIENT_TYPE = Union[Type[AsyncOpenAI], Type[OpenAI]]
 _DEFAULT_RESPONSE_FORMAT: dict[str, str] = {"type": "json_object"}
+
 
 _logger = logging.getLogger("autofns")
 
@@ -28,110 +28,50 @@ class AutoFNS:
         fns_definitions: list[dict[str, Any]],
         fns_mapping: dict[str, Callable[..., Any]] | None = None,
         api_key: str | None = None,
-        client: _CLIENT_TYPE = OpenAI,
         response_format: dict[str, str] | None = None,
     ) -> None:
+        """
+        :param model: The model to use.
+        :type model: str
+        :param fns_definitions: The list of function definitions.
+        :type fns_definitions: list[dict[str, Any]]
+        :param fns_mapping: The mapping of function names to functions.
+        :type fns_mapping: dict[str, Callable[..., Any]] | None
+        :param api_key: The OpenAI API key.
+        :type api_key: str | None
+        :param response_format: The response format.
+        :type response_format: dict[str, str] | None
+        """
+
         self.model = model
         self.fns_mapping = fns_mapping or {}
         self.fns_definitions = fns_definitions
-
-        if api_key:
-            self.client = client(api_key=api_key)
-        else:
-            # Client will try to get the API key from
-            # the environment variable OPENAI_API_KEY
-            self.client = client()
-
+        self.client = OpenAI(api_key=api_key) if api_key else OpenAI()
         self.response_format = response_format or _DEFAULT_RESPONSE_FORMAT
 
-    def map_function(self, fn_name: str | None = None):
-        """
-        Decorator to map a function to AutoFNS.
-
-        :param fn_name:
-        :type fn_name:
-        :return:
-        :rtype:
-        """
-
-        def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
-            fn_name_ = fn_name or fn.__name__
-
-            fn_def = next(
-                (
-                    fn_definition
-                    for fn_definition in self.fns_definitions
-                    if fn_definition["function"]["name"] == fn_name_
-                ),
-                None,
-            )
-
-            if fn_def is None:
-                raise ValueError(
-                    f"Function '{fn_name_}' is not defined in fns_definitions."
-                )
-
-            self.fns_mapping[fn_name_] = fn
-
-            def wrapper(*args, **kwargs):
-                return fn(*args, **kwargs)
-
-            return wrapper
-
-        return decorator
-
-    def create_completion(
-        self,
-        messages: list[Any],
-        max_tokens: int | None = None,
-        **kwargs,
-    ) -> ChatCompletionMessage:
-        """
-        Submit a chat completion request.
-        """
-
-        completion_kwargs = {
+    @property
+    def _default_completion_kwargs(self) -> dict[str, Any]:
+        return {
             "model": self.model,
-            "messages": messages,
             "tools": self.fns_definitions,
             "response_format": self.response_format,
         }
 
-        if max_tokens:
-            completion_kwargs["max_tokens"] = max_tokens
-
+    def _build_completion_kwargs(self, **kwargs) -> dict[str, Any]:
+        completion_kwargs = self._default_completion_kwargs
         completion_kwargs.update(kwargs)
+        return completion_kwargs
 
-        while True:
-            response = self.client.completions.create(**completion_kwargs)
-
-            tool_calls = response.choices[0].message.tool_calls
-            if not tool_calls:
-                break
-
-            messages.append(response.choices[0].message)
-
-            self.handle_tool_calls(tool_calls, messages)
-
-        return response
-
-    def handle_tool_calls(
+    def _process_tool_calls(
         self,
-        tool_calls: list[ChatCompletionMessageToolCall],
+        calls: list[ChatCompletionMessageToolCall],
         messages: list[Any],
     ) -> list[Any]:
         """
-        Handle the tool calls.
-
-        :param tool_calls: The list of tool calls.
-        :type tool_calls: list[ChatCompletionMessageToolCall]
-        :param messages: The list of current messages.
-        :type messages: list[Any]
-        :return: The list of messages with the tool create_completion results.
-        :rtype: list[Any]
+        Iterate over the tool calls and call the corresponding functions.
         """
 
-        for tool_call in tool_calls:
+        for tool_call in calls:
             fn_name = tool_call.function.name
             fn_args = tool_call.function.arguments
 
@@ -139,9 +79,9 @@ class AutoFNS:
 
             if tool_fn is None:
                 return_value = f"Error: function '{fn_name}' is not defined."
-                _logger.warning(f"Call for undefined function: {fn_name}")
+                _logger.error(f"Call for undefined function: {fn_name}")
             else:
-                _logger.info(f"calling function '{fn_name}'")
+                _logger.debug(f"calling function '{fn_name}'")
                 return_value = tool_fn(**json.loads(fn_args))
 
             messages.append(
@@ -154,8 +94,50 @@ class AutoFNS:
             )
         return messages
 
+    def create_completion(
+        self,
+        messages: list[Any],
+        max_tokens: int | None = None,
+        **kwargs,
+    ) -> ChatCompletion:
+        """
+        Submit a chat completion request and process tool calls, if any.
+
+        :param messages: The list of messages.
+        :type messages: list[Any]
+        :param max_tokens: The max tokens to use.
+        :type max_tokens: int | None
+        :param kwargs: The additional kwargs to be passed to completions.create().
+        :type kwargs: Any
+        :return: The chat completion response.
+        """
+
+        completion_kwargs = self._build_completion_kwargs(
+            messages=messages,
+            max_tokens=max_tokens,
+            **kwargs,
+        )
+
+        while True:
+            response = self.client.chat.completions.create(**completion_kwargs)
+
+            tool_calls = response.choices[0].message.tool_calls
+            if not tool_calls:
+                break
+
+            messages.append(response.choices[0].message)
+
+            self._process_tool_calls(tool_calls, messages)
+
+        return response
+
 
 class AutoFNSAsync(AutoFNS):
+    """
+    A utility class that wraps an AsyncOpenAI client and automates the
+    tool calls processes.
+    """
+
     def __init__(
         self,
         model: str,
@@ -163,35 +145,34 @@ class AutoFNSAsync(AutoFNS):
         fns_definitions: list[dict[str, Any]],
         fns_mapping: dict[str, Callable[..., Any]] | None = None,
         api_key: str | None = None,
-        client: _CLIENT_TYPE = AsyncOpenAI,
         response_format: dict[str, str] | None = None,
-    ):
-        super().__init__(
-            model,
-            fns_definitions,
-            fns_mapping,
-            api_key,
-            client,
-            response_format,
-        )
+    ) -> None:
+        """
+        :param model: The model to use.
+        :type model: str
+        :param fns_definitions: The list of function definitions.
+        :type fns_definitions: list[dict[str, Any]]
+        :param fns_mapping: The mapping of function names to functions.
+        :type fns_mapping: dict[str, Callable[..., Any]] | None
+        :param api_key: The OpenAI API key.
+        :type api_key: str | None
+        :param response_format: The response format.
+        :type response_format: dict[str, str] | None
+        """
 
-    async def handle_tool_calls(
+        super().__init__(model, fns_definitions, fns_mapping, api_key, response_format)
+        self.client = AsyncOpenAI(api_key=api_key) if api_key else AsyncOpenAI()
+
+    async def _process_tool_calls(
         self,
-        tool_calls: list[ChatCompletionMessageToolCall],
+        calls: list[ChatCompletionMessageToolCall],
         messages: list[Any],
     ) -> list[Any]:
         """
-        Handle the tool calls.
-
-        :param tool_calls: The list of tool calls.
-        :type tool_calls: list[ChatCompletionMessageToolCall]
-        :param messages: The list of current messages.
-        :type messages: list[Any]
-        :return: The list of messages with the tool create_completion results.
-        :rtype: list[Any]
+        Iterate over the tool calls and call the corresponding functions.
         """
 
-        for tool_call in tool_calls:
+        for tool_call in calls:
             fn_name = tool_call.function.name
             fn_args = tool_call.function.arguments
 
@@ -199,9 +180,9 @@ class AutoFNSAsync(AutoFNS):
 
             if tool_fn is None:
                 return_value = f"Error: function '{fn_name}' is not defined."
-                _logger.warning(f"Call for undefined function: {fn_name}")
+                _logger.error(f"Call for undefined function: {fn_name}")
             else:
-                _logger.info(f"calling function '{fn_name}'")
+                _logger.debug(f"calling function '{fn_name}'")
                 if asyncio.iscoroutinefunction(tool_fn):
                     return_value = await tool_fn(**json.loads(fn_args))
                 else:
@@ -222,25 +203,28 @@ class AutoFNSAsync(AutoFNS):
         messages: list[Any],
         max_tokens: int | None = None,
         **kwargs,
-    ) -> ChatCompletionMessage:
+    ) -> ChatCompletion:
         """
-        Submit a chat completion request.
+        Submit a chat completion request and process tool calls, if any.
+
+        :param messages: The list of messages.
+        :type messages: list[Any]
+        :param max_tokens: The max tokens to use.
+        :type max_tokens: int | None
+        :param kwargs: The additional kwargs to be passed to completions.create().
+        :type kwargs: Any
+        :return: The chat completion response.
+        :rtype: ChatCompletion
         """
 
-        completion_kwargs = {
-            "model": self.model,
-            "messages": messages,
-            "tools": self.fns_definitions,
-            "response_format": self.response_format,
-        }
-
-        if max_tokens:
-            completion_kwargs["max_tokens"] = max_tokens
-
-        completion_kwargs.update(kwargs)
+        completion_kwargs = self._build_completion_kwargs(
+            messages=messages,
+            max_tokens=max_tokens,
+            **kwargs,
+        )
 
         while True:
-            response = await self.client.completions.create(**completion_kwargs)
+            response = await self.client.chat.completions.create(**completion_kwargs)
 
             tool_calls = response.choices[0].message.tool_calls
             if not tool_calls:
@@ -248,7 +232,7 @@ class AutoFNSAsync(AutoFNS):
 
             messages.append(response.choices[0].message)
 
-            await self.handle_tool_calls(tool_calls, messages)
+            await self._process_tool_calls(tool_calls, messages)
 
         return response
 
