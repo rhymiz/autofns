@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "autofns"
-version = "0.1.1"
+version = "0.1.2"
 description = "AutoFNS is a utility for automatically calling functions when interacting with the OpenAI Completions."
 authors = ["Lemi Boyce <lemuelboyce@gmail.com>"]
 readme = "README.md"
