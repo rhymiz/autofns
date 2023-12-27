@@ -4,6 +4,7 @@ import logging
 from typing import Any, Callable, Type, Union
 
 from openai import AsyncOpenAI, OpenAI
+from openai.types.chat.chat_completion_message import ChatCompletionMessage
 from openai.types.chat.chat_completion_message_tool_call import (
     ChatCompletionMessageToolCall,
 )
@@ -29,7 +30,7 @@ class AutoFNS:
         api_key: str | None = None,
         client: _CLIENT_TYPE = OpenAI,
         response_format: dict[str, str] | None = None,
-    ):
+    ) -> None:
         self.model = model
         self.fns_mapping = fns_mapping or {}
         self.fns_definitions = fns_definitions
@@ -53,7 +54,7 @@ class AutoFNS:
         :rtype:
         """
 
-        def decorator(fn: Callable[..., Any]):
+        def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
             fn_name_ = fn_name or fn.__name__
 
             fn_def = next(
@@ -79,33 +80,30 @@ class AutoFNS:
 
         return decorator
 
-    def default_kwargs(self) -> dict[str, Any]:
-        """
-        Build the kwargs to pass to the API.
-
-        :return: The kwargs to pass to the API.
-        """
-
-        kwargs = {
-            "model": self.model,
-            "tools": self.fns_mapping,
-            "response_format": self.response_format,
-        }
-        return kwargs
-
     def create_completion(
         self,
         messages: list[Any],
         max_tokens: int | None = None,
         **kwargs,
-    ):
-        _kwargs = self.default_kwargs()
-        _kwargs["messages"] = messages
-        _kwargs["max_tokens"] = max_tokens
-        _kwargs.update(kwargs)
+    ) -> ChatCompletionMessage:
+        """
+        Submit a chat completion request.
+        """
+
+        completion_kwargs = {
+            "model": self.model,
+            "messages": messages,
+            "tools": self.fns_definitions,
+            "response_format": self.response_format,
+        }
+
+        if max_tokens:
+            completion_kwargs["max_tokens"] = max_tokens
+
+        completion_kwargs.update(kwargs)
 
         while True:
-            response = self.client.completions.create(**_kwargs)
+            response = self.client.completions.create(**completion_kwargs)
 
             tool_calls = response.choices[0].message.tool_calls
             if not tool_calls:
@@ -224,14 +222,25 @@ class AutoFNSAsync(AutoFNS):
         messages: list[Any],
         max_tokens: int | None = None,
         **kwargs,
-    ):
-        _kwargs = self.default_kwargs()
-        _kwargs["messages"] = messages
-        _kwargs["max_tokens"] = max_tokens
-        _kwargs.update(kwargs)
+    ) -> ChatCompletionMessage:
+        """
+        Submit a chat completion request.
+        """
+
+        completion_kwargs = {
+            "model": self.model,
+            "messages": messages,
+            "tools": self.fns_definitions,
+            "response_format": self.response_format,
+        }
+
+        if max_tokens:
+            completion_kwargs["max_tokens"] = max_tokens
+
+        completion_kwargs.update(kwargs)
 
         while True:
-            response = await self.client.completions.create(**_kwargs)
+            response = await self.client.completions.create(**completion_kwargs)
 
             tool_calls = response.choices[0].message.tool_calls
             if not tool_calls:
