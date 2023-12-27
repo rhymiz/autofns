@@ -3,10 +3,16 @@
 ## Introduction
 
 AutoFNS is a utility for automatically calling functions when
-interacting with the OpenAI Completions.
+interacting with OpenAI Completions API.
 
 Note: This is a work in progress and may not be ready for production use.
 If you find any bugs or have any suggestions, please open an issue or a pull request.
+
+## Requirements
+
+- python >= 3.10
+- openai
+- regex
 
 ## Installation
 
