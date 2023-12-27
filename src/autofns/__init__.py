@@ -105,7 +105,7 @@ class AutoFNS:
         _kwargs.update(kwargs)
 
         while True:
-            response = self.client.completions.create(**kwargs)
+            response = self.client.completions.create(**_kwargs)
 
             tool_calls = response.choices[0].message.tool_calls
             if not tool_calls:
@@ -231,7 +231,7 @@ class AutoFNSAsync(AutoFNS):
         _kwargs.update(kwargs)
 
         while True:
-            response = await self.client.completions.create(**kwargs)
+            response = await self.client.completions.create(**_kwargs)
 
             tool_calls = response.choices[0].message.tool_calls
             if not tool_calls:
