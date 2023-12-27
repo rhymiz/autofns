@@ -2,17 +2,18 @@
 
 ## Introduction
 
-AutoFNS is a utility for automatically calling functions when
-interacting with OpenAI Completions API.
+AutoFNS is a wrapper around OpenAI's Chat Completion API. 
 
-Note: This is a work in progress and may not be ready for production use.
-If you find any bugs or have any suggestions, please open an issue or a pull request.
+It allows you to define functions as you normally would, and have them be called
+automatically when a message containing tool calls is detected. This allows you to focus on
+more important things, like the logic of your application.
+
+Note: 🧪 This is a work in progress and may not be ready for production use.
 
 ## Requirements
 
 - python >= 3.10
 - openai
-- regex
 
 ## Installation
 
@@ -80,19 +81,6 @@ fns = AutoFNS(
 result = fns.create_completion(messages=[...])
 ```
 
-You can also use the `@fns.map_function` decorator to add a function to
-AutoFNS internal mapping:
-
-```python
-from autofns import AutoFNS
-
-fns = AutoFNS(...)
-
-
-@fns.map_function  # can also pass a name to map_function
-def get_temp_units():
-    return ["Fahrenheit", "Celsius", "Kelvin"]
-```
 
 You can also use the `AutoFNSAsync` class to use async functions:
 
@@ -103,3 +91,9 @@ fns = AutoFNSAsync(...)
 
 result = await fns.create_completion(messages=[...])
 ```
+
+## License
+This project is licensed under the terms of the MIT license.
+
+## Contributing
+Contributions are welcome! Please open an issue or a pull request.
