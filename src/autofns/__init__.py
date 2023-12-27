@@ -56,7 +56,7 @@ class AutoFNS:
         def decorator(fn: Callable[..., Any]):
             fn_name_ = fn_name or fn.__name__
 
-            fn_definition = next(
+            fn_def = next(
                 (
                     fn_definition
                     for fn_definition in self.fns_definitions
@@ -65,7 +65,7 @@ class AutoFNS:
                 None,
             )
 
-            if fn_definition is None:
+            if fn_def is None:
                 raise ValueError(
                     f"Function '{fn_name_}' is not defined in fns_definitions."
                 )
@@ -245,10 +245,3 @@ class AutoFNSAsync(AutoFNS):
 
 
 __all__ = ["AutoFNS", "AutoFNSAsync"]
-
-fns = AutoFNS("davinci")
-
-
-@fns.map_function
-def my_function():
-    pass
