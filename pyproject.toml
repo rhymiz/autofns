@@ -1,11 +1,37 @@
 [tool.poetry]
 name = "autofns"
-version = "0.1.6"
+version = "0.1.7"
 description = "AutoFNS is a utility for automatically calling functions when interacting with the OpenAI Completions."
-authors = ["Lemi Boyce <lemuelboyce@gmail.com>"]
+authors = ["Lemuel Boyce <lemuelboyce@gmail.com>"]
 readme = "README.md"
 license = "MIT"
 packages = [{ include = "autofns", from = "src" }]
+repository = "https://github.com/rhymiz/autofns"
+keywords = [
+    "ai",
+    "openai",
+    "gpt-3",
+    "gpt-4",
+    "functions",
+    "chat completions",
+    "utility",
+    "autofns",
+]
+classifiers = [
+    "Typing :: Typed",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3 :: Only",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Text Processing :: Linguistic",
+]
+
 
 [tool.poetry.dependencies]
 python = "^3.10"
